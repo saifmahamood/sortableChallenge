@@ -43,20 +43,21 @@ def matchProductsAndListings(productDictionary,listingsList):
 
 productList = readFile('data/products.txt')
 productDictionary = createProductDictionary(productList)
-#print productDictionary['Panasonic']
 listingsList = readFile('data/listings.txt')
 matches = matchProductsAndListings(productDictionary,listingsList)
 
-count = 0
-for obj in matches:
-    count += len(matches[obj])
 
-print 'num listings matched :', count
-
-with open('result.txt', 'wb') as outfile:
+with open('results.txt', 'wb') as outfile:
     for obj in matches:
         writeObj = collections.OrderedDict()
         writeObj['product_name'] = obj
         writeObj['listings'] = matches[obj]
         json.dump(writeObj, outfile)
         outfile.write('\n')
+
+"""
+count = 0
+for obj in matches:
+    count += len(matches[obj])
+print 'num listings matched :', count
+"""
