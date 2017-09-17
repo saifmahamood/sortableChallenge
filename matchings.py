@@ -1,7 +1,8 @@
 import json
 import collections
+import re
 
-def readFile(filename):
+def read_file(filename):
     jsonList = []
     with open(filename) as json_file:
         for line in json_file:
@@ -9,55 +10,83 @@ def readFile(filename):
             jsonList.append(data)
         return jsonList
 
-def createProductDictionary(productList):
+def find_whole_word(w):
+    return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
+
+
+def filter_listings(listings_list):
+    sep_list = ['for' , 'pour', 'fur', 'with', 'avec']
+    new_list = []
+    for listing in listings_list:
+        for for_word in sep_list:
+            title = listing.get('title', '')
+            match = find_whole_word(for_word)(title)
+            if match:
+                title = title[:match.start()]
+            listing['title'] = title
+            new_list.append(listing)
+    return new_list
+
+
+
+def create_product_dictionary(product_list):
     products = {}
-    for json in productList:
-        familyDict =  products.get(json['manufacturer'], {})
-        if not familyDict:
-            products[json['manufacturer']] = familyDict
-        modelDict = familyDict.get(json.get('family', 'N/A'), {})
-        if not modelDict:
-            familyDict[json.get('family', 'N/A')] = modelDict
-        productListing = modelDict.get(json.get('model', 'N/A'), '')
-        if not productListing:
-            modelDict[json.get('model', 'N/A')] = json
+    for product in product_list:
+        manufacturer = product.get('manufacturer', '').lower()
+        family = product.get('family','').lower()
+        model = product.get('model', '').lower()
+        if products.get(manufacturer, {}):
+            if products[manufacturer].get(family,''):
+                products[manufacturer][family].append((model,product))
+            else:
+                products[manufacturer][family] = [(model,product)]
+        else:
+            products[manufacturer] = {}
+            products[manufacturer][family] = [(model,product)]
     return products
 
-def matchProductsAndListings(productDictionary,listingsList):
+def match_products_and_listings(product_dictionary,listings_list):
     matches = {}
-    for listing in listingsList:
-        manufacturerFamilyDict = productDictionary.get(listing.get('manufacturer','N/A'),{})
-        listingTitle = listing.get('title', '')
-        if manufacturerFamilyDict and listingTitle:
-            for family in manufacturerFamilyDict:
-                if family in listingTitle or family == 'N/A':
-                    modelDict = manufacturerFamilyDict[family]
-                    for model in modelDict:
-                        if model in listingTitle:
-                            matches[modelDict[model]['product_name']] = matches.get(modelDict[model]['product_name'], []) + [listing]
-                            break
-                    break
+    for listing in listings_list:
+        title = listing.get('title', '').lower()
+        listing_manufacturer = listing.get('manufacturer', '').lower()
+        if product_dictionary.get(listing_manufacturer):
+            for family in product_dictionary[listing_manufacturer]:
+                model_list = product_dictionary[listing_manufacturer][family]
+                for model_tup in model_list:
+                    if find_whole_word(model_tup[0])(title):
+                        matches[model_tup[1]['product_name']] = matches.get(model_tup[1]['product_name'], []) + [listing]
+                        break
+                break
     return matches
 
 
+if __name__ == "__main__":
+    import sys
 
-productList = readFile('data/products.txt')
-productDictionary = createProductDictionary(productList)
-listingsList = readFile('data/listings.txt')
-matches = matchProductsAndListings(productDictionary,listingsList)
+    if len(sys.argv) == 1:
+        products_filename = "data/products.txt"
+        listings_filename = "data/listings.txt"
+        results_filename = "data/results.txt"
+    elif len(sys.argv) == 4:
+        products_filename, listings_filename, results_filename = sys.argv[1:4]
+    else:
+        print("Usage: python " + sys.argv[0] + " [products_file, listings_file, results_file]")
+        sys.exit()
 
+    filtered_listing = filter_listings(read_file(listings_filename))
+    product_dictionary = create_product_dictionary(read_file(products_filename))
+    matches = match_products_and_listings(product_dictionary,filtered_listing)
 
-with open('results.txt', 'wb') as outfile:
+    with open(results_filename, 'wb') as outfile:
+        for obj in matches:
+            write_obj = collections.OrderedDict()
+            write_obj['product_name'] = obj
+            write_obj['listings'] = matches[obj]
+            json.dump(write_obj, outfile)
+            outfile.write('\n')
+
+    count = 0
     for obj in matches:
-        writeObj = collections.OrderedDict()
-        writeObj['product_name'] = obj
-        writeObj['listings'] = matches[obj]
-        json.dump(writeObj, outfile)
-        outfile.write('\n')
-
-"""
-count = 0
-for obj in matches:
-    count += len(matches[obj])
-print 'num listings matched :', count
-"""
+        count += len(matches[obj])
+    print 'num listings matched :', count
