@@ -21,6 +21,7 @@ def filter_listings(listings_list):
         title = listing.get('title', '')
         for for_word in sep_list:
             match = find_whole_word(for_word)(title)
+            title = title[:50]
             if match:
                 title = title[:match.start()]
         listing['title'] = title
@@ -47,7 +48,6 @@ def create_product_dictionary(product_list):
 
 def match_products_and_listings(product_dictionary,listings_list):
     matches = {}
-    i = 0
     for listing in listings_list:
         title = listing.get('title', '').lower()
         listing_manufacturer = listing.get('manufacturer', '').lower()
@@ -56,9 +56,6 @@ def match_products_and_listings(product_dictionary,listings_list):
                 model_list = product_dictionary[listing_manufacturer][family]
                 for model_tup in model_list:
                     if find_whole_word(model_tup[0])(title):
-                        i += 1
-                        if model_tup[0] == 'dc280':
-                            print model_tup[0], title, i
                         matches[model_tup[1]['product_name']] = matches.get(model_tup[1]['product_name'], []) + [listing]
                         break
                 break
@@ -79,6 +76,7 @@ if __name__ == "__main__":
         sys.exit()
 
     filtered_listing = filter_listings(read_file(listings_filename))
+    print len(filtered_listing) , " filtered listings length"
     product_dictionary = create_product_dictionary(read_file(products_filename))
     matches = match_products_and_listings(product_dictionary,filtered_listing)
 
